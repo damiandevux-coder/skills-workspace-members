@@ -8,8 +8,6 @@ import {
   FileText,
   Code2,
   FolderOpen,
-  ChevronDown,
-  ChevronRight,
   ExternalLink,
   CheckCircle2,
   XCircle,
@@ -19,6 +17,131 @@ import {
 import { MOCK_SKILL_DETAILS } from "@/data/mock-skill-details";
 import { MOCK_INSTALLED_SKILLS, MOCK_LIBRARY_SKILLS } from "@/data/mock-skills";
 
+// ── Markdown renderer ─────────────────────────────────────────────────────
+function renderMarkdown(raw: string): string {
+  // 1. Extract code blocks first so `#` inside them never becomes a heading
+  const codeBlocks: { html: string; placeholder: string }[] = [];
+
+  const withCodeExtracted = raw
+    .replace(/```bash\n([\s\S]*?)```/gm, (_, code) => {
+      const ph = `{{CODE_BLOCK_${codeBlocks.length}}}`;
+      codeBlocks.push({
+        placeholder: ph,
+        html: `<pre class="bg-[#101010] border border-[#303036] rounded-lg p-4 my-4 overflow-x-auto"><code class="text-[13px] font-mono text-[#4ade80]">${escapeHtml(code.trimEnd())}</code></pre>`,
+      });
+      return ph;
+    })
+    .replace(/```\n?([\s\S]*?)```/gm, (_, code) => {
+      const ph = `{{CODE_BLOCK_${codeBlocks.length}}}`;
+      codeBlocks.push({
+        placeholder: ph,
+        html: `<pre class="bg-[#101010] border border-[#303036] rounded-lg p-4 my-4 overflow-x-auto"><code class="text-[13px] font-mono text-[#a7a7ad]">${escapeHtml(code.trimEnd())}</code></pre>`,
+      });
+      return ph;
+    });
+
+  // 2. Process line-by-line
+  const lines = withCodeExtracted.split("\n");
+  const outLines: string[] = [];
+  let inList = false;
+
+  const flushList = () => {
+    if (inList) {
+      outLines.push("</ul>");
+      inList = false;
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Code placeholder — pass through
+    if (line.startsWith("{{CODE_BLOCK_")) {
+      flushList();
+      outLines.push(line);
+      continue;
+    }
+
+    // Empty line — just flush list, don't render a paragraph for it
+    if (!line.trim()) {
+      flushList();
+      continue;
+    }
+
+    // Headings (anchored to line start)
+    if (line.startsWith("### ")) {
+      flushList();
+      outLines.push(
+        `<h3 class="text-base font-medium text-[#f5f5f5] mt-5 mb-2">${inlineFmt(line.slice(4))}</h3>`
+      );
+      continue;
+    }
+    if (line.startsWith("## ")) {
+      flushList();
+      outLines.push(
+        `<h2 class="text-lg font-medium text-[#f5f5f5] mt-6 mb-3">${inlineFmt(line.slice(3))}</h2>`
+      );
+      continue;
+    }
+    if (line.startsWith("# ")) {
+      flushList();
+      outLines.push(
+        `<h1 class="text-xl font-semibold text-[#f5f5f5] mb-4">${inlineFmt(line.slice(2))}</h1>`
+      );
+      continue;
+    }
+
+    // List items
+    if (line.startsWith("- ")) {
+      if (!inList) {
+        outLines.push('<ul class="list-disc list-inside space-y-1 my-3 text-[#a7a7ad]">');
+        inList = true;
+      }
+      outLines.push(`<li>${inlineFmt(line.slice(2))}</li>`);
+      continue;
+    }
+
+    // Regular paragraph
+    flushList();
+    outLines.push(`<p class="my-3 text-[#a7a7ad] leading-relaxed">${inlineFmt(line)}</p>`);
+  }
+
+  flushList();
+
+  // 3. Restore code blocks
+  let html = outLines.join("\n");
+  for (const { placeholder, html: blockHtml } of codeBlocks) {
+    html = html.replace(placeholder, blockHtml);
+  }
+
+  return html;
+}
+
+function inlineFmt(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-[#f5f5f5]">$1</strong>')
+    .replace(/\*(.+?)\*/g, "<em>$1</em>");
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function MarkdownRenderer({ content }: { content: string }) {
+  return (
+    <div
+      className="text-[#a7a7ad] leading-relaxed"
+      dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
+    />
+  );
+}
+// ───────────────────────────────────────────────────────────────────────────
+
 export default function SkillDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -27,7 +150,6 @@ export default function SkillDetailPage() {
   const detail = MOCK_SKILL_DETAILS[skillId];
   const allSkills = [...MOCK_INSTALLED_SKILLS, ...MOCK_LIBRARY_SKILLS];
 
-  const [expandedFiles, setExpandedFiles] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "files">("overview");
 
   const related = useMemo(() => {
@@ -169,31 +291,7 @@ export default function SkillDetailPage() {
                 className="prose prose-invert prose-sm max-w-none"
               >
                 <div className="rounded-xl border border-[#303036] bg-[#0b0b0c] p-6">
-                  <div
-                    className="text-[#a7a7ad] leading-relaxed whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{
-                      __html: detail.overview
-                        // Code blocks first (avoid transforming content inside)
-                        .replace(/```bash\n([\s\S]*?)```/gm, '<pre class="bg-[#101010] border border-[#303036] rounded-lg p-4 mt-3 mb-3 overflow-x-auto"><code class="text-[13px] font-mono text-[#4ade80]">$1</code></pre>')
-                        .replace(/```\n([\s\S]*?)```/gm, '<pre class="bg-[#101010] border border-[#303036] rounded-lg p-4 mt-3 mb-3 overflow-x-auto"><code class="text-[13px] font-mono text-[#a7a7ad]">$1</code></pre>')
-                        // Headings (anchored to line start)
-                        .replace(/^### (.*)$/gm, '<h3 class="text-base font-medium text-[#f5f5f5] mt-4 mb-2">$1</h3>')
-                        .replace(/^## (.*)$/gm, '<h2 class="text-lg font-medium text-[#f5f5f5] mt-6 mb-3">$1</h2>')
-                        .replace(/^# (.*)$/gm, '<h1 class="text-xl font-semibold text-[#f5f5f5] mb-4">$1</h1>')
-                        // Inline formatting
-                        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-[#f5f5f5]">$1</strong>')
-                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                        // List items (anchored)
-                        .replace(/^- (.*)$/gm, '<li class="ml-4 text-[#a7a7ad] mb-1">$1</li>')
-                        // Wrap consecutive li in ul
-                        .replace(/(<li[^>]*>[\s\S]*?<\/li>)(?:\s*<br \/>\s*)*(?=\s*<li)/g, '$1')
-                        .replace(/(<li[^>]*>[\s\S]*?<\/li>)+/g, '<ul class="space-y-1 mb-3 mt-2">$&</ul>')
-                        // Paragraphs (remaining text blocks)
-                        .replace(/\n\n/g, '</p><p class="mb-3 text-[#a7a7ad]">')
-                        // Remaining single newlines
-                        .replace(/\n/g, ' '),
-                    }}
-                  />
+                  <MarkdownRenderer content={detail.overview} />
                 </div>
               </motion.div>
             ) : (
