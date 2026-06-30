@@ -3,13 +3,12 @@ export interface WorkspaceSkill {
   name: string;
   description: string;
   category: string;
-  emoji?: string;
-  homepage?: string;
+  emoji: string;
   requiresEnv: string[];
   requiresBins: string[];
   os: string[];
   installHints: string[];
-  disabled?: boolean;
+  disabled: boolean;
   hasScripts: boolean;
   hasReferences: boolean;
   hasAssets: boolean;
@@ -49,3 +48,36 @@ export const OS_OPTIONS = [
   { value: "linux", label: "Linux" },
   { value: "win32", label: "Windows" },
 ];
+
+export interface SkillFile {
+  name: string;
+  type: "script" | "reference" | "asset" | "skill";
+  size?: string;
+  content?: string;
+}
+
+export interface SkillDetail extends WorkspaceSkill {
+  overview: string; // Markdown content from SKILL.md
+  files: SkillFile[];
+  relatedSkills: string[]; // IDs of related skills
+}
+
+export interface KnowledgeItem {
+  id: string;
+  name: string;
+  type: "folder" | "file";
+  emoji?: string;
+  size?: string;
+  modified?: string;
+  children?: KnowledgeItem[];
+  content?: string;
+}
+
+export interface SharedKnowledge {
+  id: string;
+  name: string;
+  description: string;
+  emoji: string;
+  items: KnowledgeItem[];
+  assignedAgents: string[];
+}

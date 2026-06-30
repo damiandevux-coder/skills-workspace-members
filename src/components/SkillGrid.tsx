@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { Search, Plus, FileText, Zap, Wrench, Upload, Library, Puzzle } from "lucide-react";
 import { WorkspaceSkill } from "@/types/skills";
 
@@ -24,6 +25,7 @@ function SkillCard({
   isLibrary?: boolean;
   onAction?: () => void;
 }) {
+  const router = useRouter();
   const toolIcons = [
     skill.hasScripts && <Wrench key="scripts" className="h-3 w-3 text-[#85858e]" />,
     skill.hasReferences && <FileText key="refs" className="h-3 w-3 text-[#85858e]" />,
@@ -33,7 +35,8 @@ function SkillCard({
   return (
     <motion.div
       whileHover={{ scale: 1.01 }}
-      className="group relative rounded-xl border border-[#303036] bg-[#0b0b0c] p-4 transition-colors hover:border-[#3d3d40]"
+      onClick={() => router.push(`/skill/${skill.id}`)}
+      className="group relative rounded-xl border border-[#303036] bg-[#0b0b0c] p-4 transition-colors hover:border-[#3d3d40] cursor-pointer"
     >
       {/* Status dot */}
       <div className="absolute top-3 right-3 flex items-center gap-1.5">
