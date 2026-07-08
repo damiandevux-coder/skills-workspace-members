@@ -71,6 +71,8 @@ export interface KnowledgeItem {
   modified?: string;
   children?: KnowledgeItem[];
   content?: string;
+  /** Conversion lifecycle for files. Absent means ready. Folders never carry a status. */
+  status?: "ready" | "processing" | "queued" | "failed";
 }
 
 export interface SharedKnowledge {
