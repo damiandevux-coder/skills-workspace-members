@@ -406,6 +406,7 @@ export default function WorkspaceKnowledgePage() {
     if (new URLSearchParams(window.location.search).get("new") === "1") {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync from window.location on mount, not a render-loop hazard
       setIsNewModalOpen(true);
+      window.history.replaceState(null, "", "/workspaces/knowledge");
     }
   }, []);
 
@@ -474,7 +475,11 @@ export default function WorkspaceKnowledgePage() {
       {filtered.length === 0 && (
         <div className="rounded-xl border border-[#333333] bg-[#181818] px-5 py-12 text-center">
           <HardDrive className="mx-auto mb-3 h-5 w-5 text-[#696969]" />
-          <p className="text-sm text-[#85858e]">No knowledge bases match your search.</p>
+          <p className="text-sm text-[#85858e]">
+            {searchQuery.trim()
+              ? "No knowledge bases match your search."
+              : "No knowledge bases in this workspace yet."}
+          </p>
         </div>
       )}
 
